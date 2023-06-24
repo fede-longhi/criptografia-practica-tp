@@ -1,13 +1,13 @@
 from field import FieldElement
-from polynomial import interpolate_poly
+from polynomial import interpolate_poly, X, prod
 from channel import Channel
 from merkle import MerkleTree
+from utils import CP_eval
 
 # Constants
 # trace size
 # larger domain size (porque lo multiplicamos por 8...)
 # constraints -> ver lo de blowup factor
-
 
 # Traza
 trace_size = 3*2**3 # 24
@@ -44,6 +44,27 @@ channel.send(f_merkle.root)
 
 print(channel.proof) # proof so far
 
+# First constraint
+numer0 = f - 2
+denom0 = X - 1 # X - g^0
 
+p0 = numer0/denom0
 
+# Second constraint -> hay segunda constraint?
 
+# Third constraint -> si no hay segunda esta deberia ser segunda
+numer2 = f(g*X) - f(X)**8
+denom2 = ((X**trace_size) - 1) / prod([X - g**i for i in range(20, trace_size)]) # esto hay que chequear
+
+p2 = numer2/denom2
+
+print('deg p0: ', p0.degree())
+print('deg p2: ', p2.degree()) # este esta mal tiene que dar < 24 (trace size)
+
+polynomials = [p0, p2]
+
+# Commit on the composition polynomial
+
+channel = Channel() # ver si hay que crearlo de nuevo
+CP_merkle = MerkleTree(CP_eval(channel, polynomials, eval_domain))
+channel.send(CP_merkle.root)
