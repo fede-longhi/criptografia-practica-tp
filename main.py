@@ -1,13 +1,18 @@
+import time
 from field import FieldElement
 from polynomial import interpolate_poly, X, prod
 from channel import Channel
 from merkle import MerkleTree
-from utils import CP_eval
+from utils import get_CP, get_CP_eval, FriCommit, decommit_fri
 
 # Constants
 # trace size
 # larger domain size (porque lo multiplicamos por 8...)
 # constraints -> ver lo de blowup factor
+
+start = time.time()
+start_all = start
+print("Generating the trace...")
 
 # Traza
 trace_size = 3*2**3 # 24
@@ -44,6 +49,10 @@ channel.send(f_merkle.root)
 
 print(channel.proof) # proof so far
 
+print(f'{time.time() - start}s')
+start = time.time()
+print("Generating the composition polynomial and the FRI layers...")
+
 # First constraint
 numer0 = f - 2
 denom0 = X - 1 # X - g^0
@@ -65,6 +74,26 @@ polynomials = [p0, p2]
 
 # Commit on the composition polynomial
 
-channel = Channel() # ver si hay que crearlo de nuevo
-CP_merkle = MerkleTree(CP_eval(channel, polynomials, eval_domain))
+# channel = Channel() # ver si hay que crearlo de nuevo
+CP = get_CP(channel, polynomials)
+CP_eval = get_CP_eval(CP, eval_domain)
+CP_merkle = MerkleTree(CP_eval)
 channel.send(CP_merkle.root)
+
+# Part 3
+fri_polys, fri_domains, fri_layers, fri_merkles = FriCommit(CP, eval_domain, CP_eval, CP_merkle, channel)
+print(channel.proof)
+
+
+print(f'{time.time() - start}s')
+start = time.time()
+print("Generating queries and decommitments...")
+
+length = larger_domain_size - 1
+decommit_fri(channel, f_eval, f_merkle, fri_layers, fri_merkles, length)
+
+print(f'{time.time() - start}s')
+start = time.time()
+print(channel.proof)
+print(f'Overall time: {time.time() - start_all}s')
+print(f'Uncompressed proof length in characters: {len(str(channel.proof))}')
