@@ -1,6 +1,12 @@
+from field import FieldElement
 from channel import Channel
 from polynomial import Polynomial
 from merkle import MerkleTree
+
+def generate_group(group_order, group_size):
+    g = FieldElement.generator()**(group_order//group_size) # 3*2**30 / 2**27 = 3*2**3 (trace_size)
+    G = [g ** i for i in range(group_size)]
+    return G
 
 def get_CP(channel, polynomials):
     CP = 0
@@ -36,7 +42,7 @@ def FriCommit(cp, domain, cp_eval, cp_merkle, channel):
     fri_domains = [domain]
     fri_layers = [cp_eval]
     fri_merkles = [cp_merkle]
-    while fri_polys[-1].degree() > 0:
+    while fri_polys[-1].degree() > 0 and len(fri_layers[-1])>1: # agrego condicion len(fri_layers[-1])>1
         beta = channel.receive_random_field_element()
         next_poly, next_domain, next_layer = next_fri_layer(fri_polys[-1], fri_domains[-1], beta)
         fri_polys.append(next_poly)
@@ -50,7 +56,6 @@ def FriCommit(cp, domain, cp_eval, cp_merkle, channel):
 # add fri_layers, fri_merkles
 def decommit_on_fri_layers(idx, channel, fri_layers, fri_merkles):
     for layer, merkle in zip(fri_layers[:-1], fri_merkles[:-1]):
-        # Fix this: send elements and authentication pathes of all the FRI layers but the last one.
         length = len(layer)
         idx = idx % length
         sib_idx = (idx + length//2) % length

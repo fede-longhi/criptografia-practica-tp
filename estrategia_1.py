@@ -40,7 +40,7 @@ from channel import Channel
 from field import FieldElement
 from polynomial import interpolate_poly, X, prod
 from merkle import MerkleTree
-from utils import get_CP
+from utils import get_CP, FriCommit, decommit_fri
 
 RESULT = FieldElement(2) ** (8 ** 20)
 
@@ -135,4 +135,8 @@ def make_proof(channel=None):
     channel.send(CP_merkle.root)
 
     # TODO: FRI
+    fri_polys, fri_domains, fri_layers, fri_merkles = FriCommit(CP, eval_domain, CP_eval, CP_merkle, channel)
+    
     return channel
+
+make_proof()
