@@ -1,12 +1,50 @@
 from field import FieldElement
 from channel import Channel
-from polynomial import Polynomial
+from polynomial import Polynomial, prod, X
 from merkle import MerkleTree
 
-def generate_group(group_order, group_size):
-    g = FieldElement.generator()**(group_order//group_size) # 3*2**30 / 2**27 = 3*2**3 (trace_size)
+def generate_trace_e1(size):
+    trace = [FieldElement(2)]
+    while len(trace) < size:
+        trace.append(trace[-1]**8)
+    return trace
+
+def generate_group(g, group_size):
     G = [g ** i for i in range(group_size)]
     return G
+
+def generate_group_and_generator(group_order, group_size):
+    g = FieldElement.generator()**(group_order//group_size) # 3*2**30 / 2**27 = 3*2**3 (trace_size)
+    G = generate_group(g, group_size)
+    return g, G
+
+def generate_larger_domain_evaluation(size, group_order, f):
+    w = FieldElement.generator()
+    h = w ** ((group_order)//(size))
+    H = [h**i for i in range(size)]
+    eval_domain = [w*x for x in H]
+
+    f_eval = [f(d) for d in eval_domain]
+    return f_eval, eval_domain
+
+def make_constraint_polys_e1(f, g, G, RESULT, group_size, trace_size):
+    # First constraint
+    numer0 = f - FieldElement(2)
+    denom0 = X - FieldElement(1) # X - g^0
+
+    p0 = numer0/denom0
+
+    # Second constraint -> hay segunda constraint?
+    numer1 = f - RESULT
+    denom1 = X - G[20]
+    p1 = numer1 / denom1
+
+    # Third constraint -> si no hay segunda esta deberia ser segunda
+    numer2 = f(g*X) - f(X)**8
+    denom2 = ((X**group_size) - FieldElement(1)) / prod([X - g**i for i in range(trace_size-1, group_size)]) # esto hay que chequear
+
+    p2 = numer2/denom2
+    return [p0, p1, p2]
 
 def get_CP(channel, polynomials):
     CP = 0
