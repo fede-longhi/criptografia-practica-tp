@@ -38,9 +38,10 @@ f(g*x) = f(x) ** 8 --> f(g*x) - f(x) ** 8 = 0 for x = g**i for 0 <= i <= 19 -->
 
 from channel import Channel
 from field import FieldElement
-from polynomial import interpolate_poly, X, prod
-from merkle import MerkleTree
-from utils import get_CP, FriCommit, decommit_fri
+from polynomial import interpolate_poly, X, prod, Polynomial
+# from merkle import MerkleTree, verify_decommitment
+from merkle_no_index import MerkleTree, verify_decommitment
+from utils import get_CP
 
 RESULT = FieldElement(2) ** (8 ** 20)
 
@@ -80,12 +81,12 @@ def make_f_poly(A, G):
     return interpolate_poly(G[:len(A)], A)
 
 
-def make_constraint_polys(f, G):
+def make_constraint_polys(f, G, result=RESULT):
 
     g = G[1]
 
     p0 = (f - FieldElement(2)) / (X - FieldElement(1))
-    p1 = (f - RESULT) / (X - G[20])
+    p1 = (f - result) / (X - G[20])
 
     p2_numerator = f(g * X) - f ** 8
 
@@ -97,6 +98,25 @@ def make_constraint_polys(f, G):
     return p0, p1, p2
 
 
+def calculate_cp(idx, fx, fgx, alphas, G, result):
+    g = G[1]
+
+    # Calculate x from idx (see make_eval_domain)
+    w = FieldElement.generator()
+    h = FieldElement.generator() ** (3 * 2 ** 30 // (24 * 8))
+    x = w * h ** idx
+
+    p0 = (fx - FieldElement(2)) / (x - FieldElement(1))
+
+    p1 = (fx - result) / (x - G[20])
+
+    p2_numerator = fgx - fx ** 8
+    p2_denom = (x ** 24 - FieldElement(1)) / prod([(x - g ** i) for i in range(20, 24)])
+    p2 = p2_numerator / p2_denom
+    polys = [p0, p1, p2]
+    return sum([alphas[i] * polys[i] for i in range(3)])
+
+
 def make_commitment_merkle(f, eval_domain):
     f_eval = [f(x) for x in eval_domain]
     # Commitments
@@ -105,12 +125,27 @@ def make_commitment_merkle(f, eval_domain):
     return f_eval, f_merkle
 
 
-def make_CP_merkle(CP, eval_domain):
-    CP_eval = [CP(x) for x in eval_domain]
+def eval_and_commit(poly, eval_domain):
+    eval_results = [poly(x) for x in eval_domain]
     # Commitments
-    CP_merkle = MerkleTree(CP_eval)
+    merkle = MerkleTree(eval_results)
 
-    return CP_eval, CP_merkle
+    return eval_results, merkle
+
+
+def make_fri_step(poly, eval_domain, beta):
+    domain_size = len(eval_domain)
+    next_domain = [x ** 2 for x in eval_domain[:(domain_size + 1) // 2]]
+    # Check 2nd half is equal to 1st half
+    # next_domain_alt = [x ** 2 for x in eval_domain[len(eval_domain) // 2:]]
+    # assert next_domain == next_domain_alt
+
+    odd_coeficients = poly.poly[1::2]
+    even_coeficients = poly.poly[::2]
+    odd = beta * Polynomial(odd_coeficients)
+    even = Polynomial(even_coeficients)
+    next_poly = odd + even
+    return next_domain, next_poly
 
 
 def make_proof(channel=None):
@@ -121,6 +156,7 @@ def make_proof(channel=None):
     G = generate_subgroup(24)
     f = make_f_poly(A, G)
     eval_domain = make_eval_domain(24 * 8)
+    # eval_domain[idx] * G[1] = eval_domain[idx + 8]
 
     f_eval, f_merkle = make_commitment_merkle(f, eval_domain)
 
@@ -130,13 +166,90 @@ def make_proof(channel=None):
 
     CP = get_CP(channel, [p0, p1, p2])
 
-    CP_eval, CP_merkle = make_CP_merkle(CP, eval_domain)
+    CP_eval, CP_merkle = eval_and_commit(CP, eval_domain)
 
     channel.send(CP_merkle.root)
 
-    # TODO: FRI
-    fri_polys, fri_domains, fri_layers, fri_merkles = FriCommit(CP, eval_domain, CP_eval, CP_merkle, channel)
-    
-    return channel
+    # CP = FRI-0
+    fri_polys, fri_domains, fri_layers, fri_merkles = [CP], [eval_domain], [CP_eval], [CP_merkle]
 
-make_proof()
+    fri_poly, fri_eval_domain = CP, eval_domain
+    while True:
+        beta = channel.receive_random_field_element()
+        fri_eval_domain, fri_poly = make_fri_step(fri_poly, fri_eval_domain, beta)
+        fri_layer, fri_merkle = eval_and_commit(fri_poly, fri_eval_domain)
+        fri_polys.append(fri_poly)
+        fri_domains.append(fri_eval_domain)
+        fri_layers.append(fri_layer)
+        fri_merkles.append(fri_merkle)
+        channel.send(fri_merkle.root)
+        if fri_poly.degree() < 1:
+            channel.send(str(fri_poly.poly[0]))
+            break
+
+    return channel, f_eval, f_merkle, fri_polys, fri_domains, fri_layers, fri_merkles
+
+
+def add_query(channel, f_eval, f_merkle, fri_polys, fri_domains, fri_layers, fri_merkles):
+    # En mi CP tengo f(x) y f(g*x), entonces x puede ser g**i i=0..len(f_eval - 8)
+    idx = channel.receive_random_int(0, len(f_eval) - 8)
+    channel.send(str(f_eval[idx]))  # f(x)
+    channel.send(",".join(f_merkle.get_authentication_path(idx)))  # auth path for f(x)
+    channel.send(str(f_eval[idx + 8]))  # f(g*x)
+    channel.send(",".join(f_merkle.get_authentication_path(idx + 8)))  # auth path for f(g*x)
+
+    for layer, merkle in zip(fri_layers[:-1], fri_merkles[:-1]):
+        length = len(layer)
+        idx = idx % length
+        sib_idx = (idx + length // 2) % length
+        channel.send(str(layer[idx]))
+        channel.send(",".join(merkle.get_authentication_path(idx)))
+        channel.send(str(layer[sib_idx]))
+        channel.send(",".join(merkle.get_authentication_path(sib_idx)))
+    channel.send(str(fri_layers[-1][0]))
+
+
+def verifier(channel, result, number_of_queries):
+    proofs = [p[len("send:"):] for p in channel.proof if p.startswith("send:")]
+
+    G = generate_subgroup(24)
+    eval_domain = make_eval_domain(24 * 8)
+
+    replay_channel = Channel()
+    f_merkle_root = proofs[0]
+    replay_channel.send(f_merkle_root)
+    alphas = [replay_channel.receive_random_field_element() for i in range(3)]
+
+    cp_merkle_root = proofs[1]
+    replay_channel.send(cp_merkle_root)
+
+    fri_size = 8
+    betas = []
+    fri_roots = proofs[2:2 + fri_size]
+    for i in range(fri_size):
+        betas.append(replay_channel.receive_random_field_element())
+        replay_channel.send(proofs[2 + i])
+    fri_constant = FieldElement(int(proofs[2 + fri_size]))
+
+    query_proofs = proofs[2 + fri_size + 1:]
+
+    for query in range(number_of_queries):
+        idx = replay_channel.receive_random_int(0, 24 * 8 - 8)
+        fx = FieldElement(int(query_proofs[query * 4]))
+        fx_auth_path = query_proofs[query * 4 + 1].split(",")
+        fgx = FieldElement(int(query_proofs[query * 4 + 2]))
+        fgx_auth_path = query_proofs[query * 4 + 3].split(",")
+
+        # Check fx and fgx belongs to f_merkle_root
+        verify_decommitment(fx, fx_auth_path, f_merkle_root)
+        verify_decommitment(fgx, fgx_auth_path, f_merkle_root)
+
+        cp_0 = calculate_cp(idx, fx, fgx, alphas, G, result)
+        cp_0_auth_path = query_proofs[query * 4 + 4].split(",")
+
+        # verify_decommitment(cp_0, cp_0_auth_path, cp_merkle_root)
+
+        # Check cp_0 belongs to
+
+        for fri_id in range(fri_size):
+            pass
