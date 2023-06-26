@@ -99,7 +99,10 @@ class MerkleTree(object):
 
         # First proof is the sibling leaf
         other_idx = (my_idx + 1) if my_idx % 2 == 0 else (my_idx - 1)
-        proof.append(leafs[other_idx * 32:other_idx * 32 + 32])
+        other_leaf = leafs[other_idx * 32:other_idx * 32 + 32]
+        if other_leaf == b"":
+            other_leaf = b"\0" * 32
+        proof.append(other_leaf)
 
         # Start the process going up in the tree
         level_start = 32 + leaf_count * 32 + (32 if leaf_count % 2 == 1 else 0)

@@ -44,6 +44,27 @@ def test_make_constraint_polys():
     assert p2.degree() == 140
 
 
+def test_calculate_cp():
+    trace = E1.generate_trace()
+    G = E1.generate_subgroup(24)
+    g = G[1]
+
+    f = E1.make_f_poly(trace, G)
+
+    constraints = E1.make_constraint_polys(f, G)
+    eval_domain = E1.make_eval_domain(24 * 8)
+
+    alphas = [FieldElement.random_element() for x in range(3)]
+    CP = sum([constraints[i] * alphas[i] for i in range(3)])
+
+    for idx in range(len(eval_domain)):
+        x = eval_domain[idx]
+        cp_x = CP(x)
+        x_calculated, cp_x_calculated = E1.calculate_cp(idx, f(x), f(g * x), alphas, G, E1.RESULT)
+        assert x_calculated == x
+        assert cp_x_calculated == cp_x
+
+
 def test_make_eval_domain():
     size = 24 * 8
     assert size > 140, "El tamaño es menor que el grado de los constraints"
@@ -148,8 +169,9 @@ def test_add_query():
 def test_verifier():
     channel, f_eval, f_merkle, fri_polys, fri_domains, fri_layers, fri_merkles = E1.make_proof()
 
-    # Add 2 queries
-    E1.add_query(channel, f_eval, f_merkle, fri_polys, fri_domains, fri_layers, fri_merkles)
-    E1.add_query(channel, f_eval, f_merkle, fri_polys, fri_domains, fri_layers, fri_merkles)
+    number_of_queries = 5
 
-    E1.verifier(channel, E1.RESULT, 2)
+    for i in range(number_of_queries):
+        E1.add_query(channel, f_eval, f_merkle, fri_polys, fri_domains, fri_layers, fri_merkles)
+
+    E1.verifier(channel, E1.RESULT, number_of_queries)

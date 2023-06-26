@@ -41,7 +41,6 @@ from field import FieldElement
 from polynomial import interpolate_poly, X, prod, Polynomial
 # from merkle import MerkleTree, verify_decommitment
 from merkle_no_index import MerkleTree, verify_decommitment
-from utils import get_CP
 
 RESULT = FieldElement(2) ** (8 ** 20)
 
@@ -114,7 +113,7 @@ def calculate_cp(idx, fx, fgx, alphas, G, result):
     p2_denom = (x ** 24 - FieldElement(1)) / prod([(x - g ** i) for i in range(20, 24)])
     p2 = p2_numerator / p2_denom
     polys = [p0, p1, p2]
-    return sum([alphas[i] * polys[i] for i in range(3)])
+    return x, sum([alphas[i] * polys[i] for i in range(3)])
 
 
 def make_commitment_merkle(f, eval_domain):
@@ -162,9 +161,11 @@ def make_proof(channel=None):
 
     channel.send(f_merkle.root)
 
-    p0, p1, p2 = make_constraint_polys(f, G)
+    constraints = make_constraint_polys(f, G)
 
-    CP = get_CP(channel, [p0, p1, p2])
+    alphas = [channel.receive_random_field_element() for i in range(3)]
+    print(f"Alphas {alphas}")
+    CP = sum([constraints[i] * alphas[i] for i in range(3)])
 
     CP_eval, CP_merkle = eval_and_commit(CP, eval_domain)
 
@@ -176,6 +177,7 @@ def make_proof(channel=None):
     fri_poly, fri_eval_domain = CP, eval_domain
     while True:
         beta = channel.receive_random_field_element()
+        print(f"Beta {beta}")
         fri_eval_domain, fri_poly = make_fri_step(fri_poly, fri_eval_domain, beta)
         fri_layer, fri_merkle = eval_and_commit(fri_poly, fri_eval_domain)
         fri_polys.append(fri_poly)
@@ -197,6 +199,10 @@ def add_query(channel, f_eval, f_merkle, fri_polys, fri_domains, fri_layers, fri
     channel.send(",".join(f_merkle.get_authentication_path(idx)))  # auth path for f(x)
     channel.send(str(f_eval[idx + 8]))  # f(g*x)
     channel.send(",".join(f_merkle.get_authentication_path(idx + 8)))  # auth path for f(g*x)
+    print(
+        f"idx = {idx} / X = {fri_domains[0][idx]} / f(x) = {f_eval[idx]} / f(gx) = {f_eval[idx + 8]}"
+        f" / CP(x) = {fri_polys[0](fri_domains[0][idx])} / CP(x) = {fri_layers[0][idx]}"
+    )
 
     for layer, merkle in zip(fri_layers[:-1], fri_merkles[:-1]):
         length = len(layer)
@@ -206,6 +212,7 @@ def add_query(channel, f_eval, f_merkle, fri_polys, fri_domains, fri_layers, fri
         channel.send(",".join(merkle.get_authentication_path(idx)))
         channel.send(str(layer[sib_idx]))
         channel.send(",".join(merkle.get_authentication_path(sib_idx)))
+        print(f"{length} - cp(x) {layer[idx]} - cp(-x) {layer[sib_idx]}")
     channel.send(str(fri_layers[-1][0]))
 
 
@@ -214,6 +221,7 @@ def verifier(channel, result, number_of_queries):
 
     G = generate_subgroup(24)
     eval_domain = make_eval_domain(24 * 8)
+    length = 24 * 8
 
     replay_channel = Channel()
     f_merkle_root = proofs[0]
@@ -230,26 +238,61 @@ def verifier(channel, result, number_of_queries):
         betas.append(replay_channel.receive_random_field_element())
         replay_channel.send(proofs[2 + i])
     fri_constant = FieldElement(int(proofs[2 + fri_size]))
+    replay_channel.send(str(fri_constant))
 
-    query_proofs = proofs[2 + fri_size + 1:]
+    queries_proofs = proofs[2 + fri_size + 1:]
+    proofs_per_query = (
+        2 +  # fx + auth_path
+        2 +  # fgx + auth_path
+        4 * fri_size +  # CPi(x) + auth_path + CPi(-x) + auth_path
+        1    # fri_constant
+    )
 
     for query in range(number_of_queries):
+        query_proofs = queries_proofs[query * proofs_per_query:(query + 1) * proofs_per_query]
         idx = replay_channel.receive_random_int(0, 24 * 8 - 8)
-        fx = FieldElement(int(query_proofs[query * 4]))
-        fx_auth_path = query_proofs[query * 4 + 1].split(",")
-        fgx = FieldElement(int(query_proofs[query * 4 + 2]))
-        fgx_auth_path = query_proofs[query * 4 + 3].split(",")
+        fx = FieldElement(int(query_proofs[0]))
+        fx_auth_path = query_proofs[1].split(",")
+        fgx = FieldElement(int(query_proofs[2]))
+        fgx_auth_path = query_proofs[3].split(",")
 
         # Check fx and fgx belongs to f_merkle_root
         verify_decommitment(fx, fx_auth_path, f_merkle_root)
         verify_decommitment(fgx, fgx_auth_path, f_merkle_root)
 
-        cp_0 = calculate_cp(idx, fx, fgx, alphas, G, result)
-        cp_0_auth_path = query_proofs[query * 4 + 4].split(",")
+        x, cp_0 = calculate_cp(idx, fx, fgx, alphas, G, result)
 
-        # verify_decommitment(cp_0, cp_0_auth_path, cp_merkle_root)
+        print(
+            f"idx = {idx} / f(x) = {fx} / f(gx) = {fgx} / "
+            f"x = {x} / CP(x) = {cp_0}"
+        )
 
-        # Check cp_0 belongs to
+        # Check calculated CP_0 matches received CP_0
+        assert str(cp_0) == query_proofs[4]
+        cp_0_auth_path = query_proofs[5].split(",")
+        verify_decommitment(cp_0, cp_0_auth_path, cp_merkle_root)
 
-        for fri_id in range(fri_size):
-            pass
+        cp_0_sib = FieldElement(int(query_proofs[6]))
+        cp_0_sib_auth_path = query_proofs[7].split(",")
+        verify_decommitment(cp_0_sib, cp_0_sib_auth_path, cp_merkle_root)
+
+        for fri_id in range(fri_size - 2):  # TODO: me falla en las siguientes
+            g_x2 = (cp_0 + cp_0_sib) / FieldElement(2)
+            h_x2 = (cp_0 - cp_0_sib) / (x * FieldElement(2))
+            cp_0 = g_x2 + betas[fri_id] * h_x2
+            x = x ** 2
+
+            print(f"fri_id: {fri_id} / cp_0: {cp_0} / x: {x}")
+
+            # Check the new cp_0
+            assert str(cp_0) == query_proofs[8 + fri_id * 4]
+            cp_0_auth_path = query_proofs[8 + fri_id * 4 + 1].split(",")
+            verify_decommitment(cp_0, cp_0_auth_path, fri_roots[fri_id])
+
+            # Check the new cp_0_sib
+            cp_0_sib = FieldElement(int(query_proofs[8 + fri_id * 4 + 2]))
+            cp_0_sib_auth_path = query_proofs[8 + fri_id * 4 + 3].split(",")
+            verify_decommitment(cp_0_sib, cp_0_sib_auth_path, fri_roots[fri_id])
+
+        # Write to channel to update random
+        [replay_channel.send(qp) for qp in query_proofs]
