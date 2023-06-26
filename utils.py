@@ -1,19 +1,84 @@
 from field import FieldElement
 from channel import Channel
 from polynomial import Polynomial, prod, X
-from merkle import MerkleTree
+from merkle_no_index import MerkleTree
+from polynomial import interpolate_poly
 
 
-def generate_trace_e1(size):
-    trace = [FieldElement(2)]
-    while len(trace) < size:
-        trace.append(trace[-1]**8)
+def generate_trace(start_trace, step_operation, steps):
+    """Función genérica para generar la traza
+
+    @param start a_0
+    @param step_operation función que toma trace como parámetro y devuelve el siguiente elemento
+    @param steps Cantidad de pasos
+    """
+    trace = list(start_trace)
+
+    for i in range(steps):
+        trace.append(step_operation(trace))
+
     return trace
+
+
+def generate_subgroup(size):
+    group_order = 3 * 2 ** 30
+    assert (group_order / size) == (group_order // size), "El tamaño no es divisor del orden del grupo"
+    g = FieldElement.generator() ** (group_order // size)
+    return [g ** i for i in range(size)]
 
 
 def generate_group(g, group_size):
     G = [g ** i for i in range(group_size)]
     return G
+
+
+def make_eval_domain(size):
+    group_order = 3 * 2 ** 30
+    assert (group_order / size) == (group_order // size), "El tamaño no es divisor del orden del grupo"
+
+    w = FieldElement.generator()
+    h = FieldElement.generator() ** (group_order // size)
+    H = [h ** i for i in range(size)]
+    return [w * x for x in H]
+
+
+def make_f_poly(A, G):
+    """Devuelve in polinomio que interpola
+    F(G[i]) = A[i] para i=0..len(A)
+    """
+
+    return interpolate_poly(G[:len(A)], A)
+
+
+def make_commitment_merkle(f, eval_domain):
+    f_eval = [f(x) for x in eval_domain]
+    # Commitments
+    f_merkle = MerkleTree(f_eval)
+
+    return f_eval, f_merkle
+
+
+def eval_and_commit(poly, eval_domain):
+    eval_results = [poly(x) for x in eval_domain]
+    # Commitments
+    merkle = MerkleTree(eval_results)
+
+    return eval_results, merkle
+
+
+def make_fri_step(poly, eval_domain, beta):
+    domain_size = len(eval_domain)
+    next_domain = [x ** 2 for x in eval_domain[:(domain_size + 1) // 2]]
+    # Check 2nd half is equal to 1st half
+    # next_domain_alt = [x ** 2 for x in eval_domain[len(eval_domain) // 2:]]
+    # assert next_domain == next_domain_alt
+
+    odd_coeficients = poly.poly[1::2]
+    even_coeficients = poly.poly[::2]
+    odd = beta * Polynomial(odd_coeficients)
+    even = Polynomial(even_coeficients)
+    next_poly = odd + even
+    return next_domain, next_poly
 
 
 def generate_group_and_generator(group_order, sub_group_size):

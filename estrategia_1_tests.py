@@ -1,5 +1,6 @@
 import math
 import estrategia_1 as E1
+import utils as UT
 from field import FieldElement
 
 
@@ -11,7 +12,7 @@ def test_generate_trace():
 
 
 def test_generate_subgroup():
-    subgroup = E1.generate_subgroup(E1.GROUP_SIZE)
+    subgroup = UT.generate_subgroup(E1.GROUP_SIZE)
     assert len(subgroup) == E1.GROUP_SIZE
     # Verifico que el subgrupo tenga tamaño E1.GROUP_SIZE, si multiplico el último
     # g**23 * g, me tiene que dar 1
@@ -20,9 +21,9 @@ def test_generate_subgroup():
 
 def test_make_f_poly():
     trace = E1.generate_trace()
-    subgroup = E1.generate_subgroup(E1.GROUP_SIZE)
+    subgroup = UT.generate_subgroup(E1.GROUP_SIZE)
 
-    f = E1.make_f_poly(trace, subgroup)
+    f = UT.make_f_poly(trace, subgroup)
     assert f.degree() == 20
     assert f(subgroup[20]) == E1.RESULT
     assert f(1) == 2
@@ -33,9 +34,9 @@ def test_make_f_poly():
 
 def test_make_constraint_polys():
     trace = E1.generate_trace()
-    G = E1.generate_subgroup(E1.GROUP_SIZE)
+    G = UT.generate_subgroup(E1.GROUP_SIZE)
 
-    f = E1.make_f_poly(trace, G)
+    f = UT.make_f_poly(trace, G)
 
     p0, p1, p2 = E1.make_constraint_polys(f, G)
 
@@ -46,13 +47,13 @@ def test_make_constraint_polys():
 
 def test_calculate_cp():
     trace = E1.generate_trace()
-    G = E1.generate_subgroup(E1.GROUP_SIZE)
+    G = UT.generate_subgroup(E1.GROUP_SIZE)
     g = G[1]
 
-    f = E1.make_f_poly(trace, G)
+    f = UT.make_f_poly(trace, G)
 
     constraints = E1.make_constraint_polys(f, G)
-    eval_domain = E1.make_eval_domain(E1.GROUP_SIZE * 8)
+    eval_domain = UT.make_eval_domain(E1.GROUP_SIZE * 8)
 
     alphas = [FieldElement.random_element() for x in range(3)]
     CP = sum([constraints[i] * alphas[i] for i in range(3)])
@@ -68,10 +69,10 @@ def test_calculate_cp():
 def test_make_eval_domain():
     size = E1.GROUP_SIZE * 8
     assert size > 140, "El tamaño es menor que el grado de los constraints"
-    eval_domain = E1.make_eval_domain(size)
+    eval_domain = UT.make_eval_domain(size)
     assert len(eval_domain) == size
 
-    G = E1.generate_subgroup(E1.GROUP_SIZE)
+    G = UT.generate_subgroup(E1.GROUP_SIZE)
     g = G[1]
 
     # Relación usada después en la parte de los queries
@@ -81,28 +82,28 @@ def test_make_eval_domain():
 
 def test_make_commitment_merkle():
     trace = E1.generate_trace()
-    G = E1.generate_subgroup(24)
+    G = UT.generate_subgroup(24)
 
-    f = E1.make_f_poly(trace, G)
+    f = UT.make_f_poly(trace, G)
 
-    eval_domain = E1.make_eval_domain(24 * 8)
+    eval_domain = UT.make_eval_domain(24 * 8)
 
-    f_eval, commit_merkle = E1.make_commitment_merkle(f, eval_domain)
+    f_eval, commit_merkle = UT.make_commitment_merkle(f, eval_domain)
     assert commit_merkle.root == "742708abb3da2bc4805d1ac9070ace0409b7b7c823c3cc699be08c206e36710d"
 
 
 def test_make_fri_step():
     trace = E1.generate_trace()
-    G = E1.generate_subgroup(E1.GROUP_SIZE)
+    G = UT.generate_subgroup(E1.GROUP_SIZE)
 
-    f = E1.make_f_poly(trace, G)
+    f = UT.make_f_poly(trace, G)
 
-    eval_domain = E1.make_eval_domain(E1.GROUP_SIZE * 8)
+    eval_domain = UT.make_eval_domain(E1.GROUP_SIZE * 8)
     p0, p1, p2 = E1.make_constraint_polys(f, G)
 
     CP = 2 * p0 + 3 * p1 + 4 * p2
 
-    next_eval_domain, next_poly = E1.make_fri_step(CP, eval_domain, 5)
+    next_eval_domain, next_poly = UT.make_fri_step(CP, eval_domain, 5)
     assert len(next_eval_domain) == len(eval_domain) // 2
     assert next_poly.degree() == CP.degree() // 2
 
