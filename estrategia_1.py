@@ -14,7 +14,7 @@ Longitud de la traza = 21
 
 El orden del grupo |Fx| = 3 * 2 ** 30
 
-El divisor más cercano a la longitud de la traza es: 3 * 2 ** 3 = 24
+El divisor más cercano a la longitud de la traza es: 2 ** 4 = 32
 
 LDE = 21 * X > GRADO_RESTRICCIONES
 
@@ -43,6 +43,8 @@ from polynomial import interpolate_poly, X, prod, Polynomial
 from merkle_no_index import MerkleTree, verify_decommitment
 
 RESULT = FieldElement(2) ** (8 ** 20)
+
+GROUP_SIZE = 32
 
 
 def generate_trace():
@@ -90,7 +92,7 @@ def make_constraint_polys(f, G, result=RESULT):
     p2_numerator = f(g * X) - f ** 8
 
     p2_denom = prod([(X - g ** i) for i in range(20)])
-    p2_denom_alternative = (X ** 24 - FieldElement(1)) / prod([(X - g ** i) for i in range(20, 24)])
+    p2_denom_alternative = (X ** GROUP_SIZE - FieldElement(1)) / prod([(X - g ** i) for i in range(20, GROUP_SIZE)])
     assert p2_denom == p2_denom_alternative
 
     p2 = p2_numerator / p2_denom_alternative
@@ -102,7 +104,7 @@ def calculate_cp(idx, fx, fgx, alphas, G, result):
 
     # Calculate x from idx (see make_eval_domain)
     w = FieldElement.generator()
-    h = FieldElement.generator() ** (3 * 2 ** 30 // (24 * 8))
+    h = FieldElement.generator() ** (3 * 2 ** 30 // (GROUP_SIZE * 8))
     x = w * h ** idx
 
     p0 = (fx - FieldElement(2)) / (x - FieldElement(1))
@@ -110,7 +112,7 @@ def calculate_cp(idx, fx, fgx, alphas, G, result):
     p1 = (fx - result) / (x - G[20])
 
     p2_numerator = fgx - fx ** 8
-    p2_denom = (x ** 24 - FieldElement(1)) / prod([(x - g ** i) for i in range(20, 24)])
+    p2_denom = (x ** GROUP_SIZE - FieldElement(1)) / prod([(x - g ** i) for i in range(20, GROUP_SIZE)])
     p2 = p2_numerator / p2_denom
     polys = [p0, p1, p2]
     return x, sum([alphas[i] * polys[i] for i in range(3)])
@@ -152,9 +154,9 @@ def make_proof(channel=None):
         channel = Channel()
 
     A = generate_trace()
-    G = generate_subgroup(24)
+    G = generate_subgroup(GROUP_SIZE)
     f = make_f_poly(A, G)
-    eval_domain = make_eval_domain(24 * 8)
+    eval_domain = make_eval_domain(GROUP_SIZE * 8)
     # eval_domain[idx] * G[1] = eval_domain[idx + 8]
 
     f_eval, f_merkle = make_commitment_merkle(f, eval_domain)
@@ -219,9 +221,7 @@ def add_query(channel, f_eval, f_merkle, fri_polys, fri_domains, fri_layers, fri
 def verifier(channel, result, number_of_queries):
     proofs = [p[len("send:"):] for p in channel.proof if p.startswith("send:")]
 
-    G = generate_subgroup(24)
-    eval_domain = make_eval_domain(24 * 8)
-    length = 24 * 8
+    G = generate_subgroup(GROUP_SIZE)
 
     replay_channel = Channel()
     f_merkle_root = proofs[0]
@@ -250,7 +250,7 @@ def verifier(channel, result, number_of_queries):
 
     for query in range(number_of_queries):
         query_proofs = queries_proofs[query * proofs_per_query:(query + 1) * proofs_per_query]
-        idx = replay_channel.receive_random_int(0, 24 * 8 - 8)
+        idx = replay_channel.receive_random_int(0, GROUP_SIZE * 8 - 8)
         fx = FieldElement(int(query_proofs[0]))
         fx_auth_path = query_proofs[1].split(",")
         fgx = FieldElement(int(query_proofs[2]))
@@ -276,7 +276,7 @@ def verifier(channel, result, number_of_queries):
         cp_0_sib_auth_path = query_proofs[7].split(",")
         verify_decommitment(cp_0_sib, cp_0_sib_auth_path, cp_merkle_root)
 
-        for fri_id in range(fri_size - 2):  # TODO: me falla en las siguientes
+        for fri_id in range(fri_size - 1):
             g_x2 = (cp_0 + cp_0_sib) / FieldElement(2)
             h_x2 = (cp_0 - cp_0_sib) / (x * FieldElement(2))
             cp_0 = g_x2 + betas[fri_id] * h_x2
@@ -293,6 +293,8 @@ def verifier(channel, result, number_of_queries):
             cp_0_sib = FieldElement(int(query_proofs[8 + fri_id * 4 + 2]))
             cp_0_sib_auth_path = query_proofs[8 + fri_id * 4 + 3].split(",")
             verify_decommitment(cp_0_sib, cp_0_sib_auth_path, fri_roots[fri_id])
+
+        # TODO: verify fri_constant
 
         # Write to channel to update random
         [replay_channel.send(qp) for qp in query_proofs]
