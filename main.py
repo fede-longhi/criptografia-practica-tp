@@ -23,7 +23,10 @@ trace_size = 21
 larger_domain_multiplier = 8
 
 
-trace = generate_trace_e1(trace_size)
+# trace = generate_trace_e1(trace_size)
+trace = [FieldElement(2)]
+for i in range(trace_size-1):
+    trace.append(trace[-1]**8)
 assert trace[-1] == RESULT, 'el ultimo elemento no corresponde con el resultado'
 
 # Generando grupo de tamaño group_size
