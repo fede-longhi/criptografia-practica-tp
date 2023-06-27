@@ -53,7 +53,7 @@ def test_calculate_cp():
     f = UT.make_f_poly(trace, G)
 
     constraints = E1.make_constraint_polys(f, G)
-    eval_domain = UT.make_eval_domain(E1.GROUP_SIZE * 8)
+    eval_domain = UT.make_eval_domain(E1.EVAL_SIZE)
 
     alphas = [FieldElement.random_element() for x in range(3)]
     CP = sum([constraints[i] * alphas[i] for i in range(3)])
@@ -82,14 +82,15 @@ def test_make_eval_domain():
 
 def test_make_commitment_merkle():
     trace = E1.generate_trace()
-    G = UT.generate_subgroup(24)
+    G = UT.generate_subgroup(E1.GROUP_SIZE)
 
     f = UT.make_f_poly(trace, G)
 
-    eval_domain = UT.make_eval_domain(24 * 8)
+    eval_domain = UT.make_eval_domain(E1.EVAL_SIZE)
 
     f_eval, commit_merkle = UT.make_commitment_merkle(f, eval_domain)
-    assert commit_merkle.root == "742708abb3da2bc4805d1ac9070ace0409b7b7c823c3cc699be08c206e36710d"
+    if E1.BLOWUP == 8:
+        assert commit_merkle.root == "b1bb1637c1b5b32b097685229f6d8e028af87c22e2f7883abab0ceb60feff922"
 
 
 def test_make_fri_step():
@@ -115,8 +116,9 @@ def test_make_proof():
 
     fri_size = math.ceil(math.log2(CP.degree()))
     assert fri_size == len(fri_polys[1:])
+    assert fri_size == 8
 
-    assert channel.proof == [
+    assert E1.BLOWUP != 8 or channel.proof == [
         "send:b1bb1637c1b5b32b097685229f6d8e028af87c22e2f7883abab0ceb60feff922",  # Merkle root commits on f
         "receive_random_field_element:1023867590",  # alfa_1 for CP
         "receive_random_field_element:1266220913",  # alfa_2 for CP

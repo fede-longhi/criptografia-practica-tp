@@ -1,5 +1,5 @@
 """
-ESTRATEGIA 1
+ESTRATEGIA 2
 
 p = 3 * 2 ** 30 + 1
 
@@ -7,14 +7,14 @@ El statement a probar es:
 2**(8**20) mod p = RESULT = 1610563584 # Statement
 
 a_0 = 2
-a_n+1 = a_n**8 mod p
-a_20 = 2**8**20 mod p = 1610563584
+a_n+1 = a_n**2 mod p
+a_60 = 2**(2**60) mod p = 1610563584
 
-Longitud de la traza = 21
+Longitud de la traza = 61
 
 El orden del grupo |Fx| = 3 * 2 ** 30
 
-El divisor más cercano a la longitud de la traza Y POTENCIA de 2 es: 2 ** 5 = 32
+El divisor más cercano a la longitud de la traza Y POTENCIA de 2 es: 2 ** 6 = 64
 
 LDE = 21 * X > GRADO_RESTRICCIONES
 
@@ -23,17 +23,17 @@ Polinomial constraints
 f(x) = 2 for x = g**0 -->
     p0(x) = f(x) - 2 / (x - g**0) = f(x) - 2 / (x - 1)
 
-f(x) = RESULT for x = g**20 -->
-    p1(x) = f(x) - RESULT / (x - g**20)
+f(x) = RESULT for x = g**60 -->
+    p1(x) = f(x) - RESULT / (x - g**60)
 
-f(g*x) = f(x) ** 8 --> f(g*x) - f(x) ** 8 = 0 for x = g**i for 0 <= i <= 19 -->
-    p2(x) = (f(g*x) - f(x) ** 8) / [(x - g**0)*(x - g**1)... (x - g**19)]
+f(g*x) = f(x) ** 2 --> f(g*x) - f(x) ** 2 = 0 for x = g**i for 0 <= i <= 59 -->
+    p2(x) = (f(g*x) - f(x) ** 2) / [(x - g**0)*(x - g**1)... (x - g**59)]
 
-    Pero Mult(x - g**i) i=0..31 = (x ** 32 - 1) ==>
+    Pero Mult(x - g**i) i=0..63 = (x ** 64 - 1) ==>
 
-    [(x - g**0)*(x - g**1)... (x - g**19)] = (x ** 32 - 1) / prod[(x - g ** i) for i in [20, .., 31]]
+    [(x - g**0)*(x - g**1)... (x - g**59)] = (x ** 64 - 1) / prod[(x - g ** i) for i in [60, .., 63]]
 
-    p2(x) = (f(g*x) - f(x) ** 8) / ((x ** 32 - 1) / prod[(x - g ** i) for i in [20, ..., 31]])
+    p2(x) = (f(g*x) - f(x) ** 2) / ((x ** 64 - 1) / prod[(x - g ** i) for i in [60, ..., 63]])
 """
 
 from channel import Channel
@@ -44,17 +44,19 @@ import utils
 
 RESULT = FieldElement(2) ** (8 ** 20)
 
-GROUP_SIZE = 32
+GROUP_SIZE = 64
 
-TRACE_SIZE = 20
+TRACE_SIZE = 60
 
-BLOWUP = 16
+BLOWUP = 1
 
 EVAL_SIZE = GROUP_SIZE * BLOWUP
 
+cache = {}
+
 
 def generate_trace():
-    return utils.generate_trace([FieldElement(2)], lambda trace: trace[-1] ** 8, 20)
+    return utils.generate_trace([FieldElement(2)], lambda trace: trace[-1] ** 2, 60)
 
 
 def make_constraint_polys(f, G, result=RESULT):
@@ -62,9 +64,9 @@ def make_constraint_polys(f, G, result=RESULT):
     g = G[1]
 
     p0 = (f - FieldElement(2)) / (X - FieldElement(1))
-    p1 = (f - result) / (X - G[20])
+    p1 = (f - result) / (X - G[TRACE_SIZE])
 
-    p2_numerator = f(g * X) - f ** 8
+    p2_numerator = f(g * X) - f ** 2
 
     # p2_denom_naif = prod([(X - g ** i) for i in range(20)])
     p2_denom = (X ** GROUP_SIZE - FieldElement(1)) / prod(
@@ -88,7 +90,7 @@ def calculate_cp(idx, fx, fgx, alphas, G, result):
 
     p1 = (fx - result) / (x - G[TRACE_SIZE])
 
-    p2_numerator = fgx - fx ** 8
+    p2_numerator = fgx - fx ** 2
     p2_denom = (x ** GROUP_SIZE - FieldElement(1)) / prod(
         [(x - g ** i) for i in range(TRACE_SIZE, GROUP_SIZE)]
     )
@@ -105,7 +107,7 @@ def make_proof(channel=None):
     G = utils.generate_subgroup(GROUP_SIZE)
     f = utils.make_f_poly(A, G)
     eval_domain = utils.make_eval_domain(EVAL_SIZE)
-    # eval_domain[idx] * G[1] = eval_domain[idx + BLOWUP]
+    # eval_domain[idx] * G[1] = eval_domain[idx + 8]
 
     f_eval, f_merkle = utils.make_commitment_merkle(f, eval_domain)
 
@@ -137,11 +139,16 @@ def make_proof(channel=None):
             channel.send(str(fri_poly.poly[0]))
             break
 
+    cache["CP"] = CP
+    cache["f"] = f
+    cache["G"] = G
+    cache["f_eval"] = f_eval
+
     return channel, f_eval, f_merkle, fri_polys, fri_domains, fri_layers, fri_merkles
 
 
 def add_query(channel, f_eval, f_merkle, fri_polys, fri_domains, fri_layers, fri_merkles):
-    # En mi CP tengo f(x) y f(g*x), entonces x puede ser g**i i=0..len(f_eval - 8)
+    # En mi CP tengo f(x) y f(g*x), entonces x puede ser g**i i=0..len(f_eval - 2)
     idx = channel.receive_random_int(0, len(f_eval) - BLOWUP)
     channel.send(str(f_eval[idx]))  # f(x)
     channel.send(",".join(f_merkle.get_authentication_path(idx)))  # auth path for f(x)
@@ -178,7 +185,7 @@ def verifier(channel, result, number_of_queries):
     cp_merkle_root = proofs[1]
     replay_channel.send(cp_merkle_root)
 
-    fri_size = 8
+    fri_size = 6
     betas = []
     fri_roots = proofs[2:2 + fri_size]
     for i in range(fri_size):
