@@ -1,77 +1,64 @@
-import time
-from field import FieldElement
-from polynomial import interpolate_poly, X, prod
-from channel import Channel
-from merkle import MerkleTree
-from utils import *
+import timeit
 
-# Constantes Generales
-group_order = 3 * 2 ** 30
-assert group_order == FieldElement.k_modulus - 1
+import estrategia_1 as E1
+import estrategia_2 as E2
+import estrategia_3 as E3
+import estrategia_4 as E4
 
-RESULT = FieldElement(2)**(8**20)
-
-# Estrategia 1
-
-start = time.time()
-start_all = start
-print("Generating the trace...")
-
-# Traza
-group_size = 24 # 3*2**3 = 24
-trace_size = 21
-larger_domain_multiplier = 8
+TIMEIT_COUNT = 100
 
 
-# trace = generate_trace_e1(trace_size)
-trace = [FieldElement(2)]
-for i in range(trace_size-1):
-    trace.append(trace[-1]**8)
-assert trace[-1] == RESULT, 'el ultimo elemento no corresponde con el resultado'
+def print_E_performance(name, number, E):
+    # Estrategia 1
+    print(name)
 
-# Generando grupo de tamaño group_size
-g, G = generate_group_and_generator(group_order, group_size)
+    print(f"Tamaño de la traza: {E.TRACE_SIZE + 1}")
+    print(f"Tamaño del grupo: {E.GROUP_SIZE}")
+    print(f"Tamaño del dominio de evaluación: {E.EVAL_SIZE}")
 
-# Interpolando
-f = interpolate_poly(G[:trace_size], trace)
+    proof = E.make_proof()
+    channel = proof[0]
+    proofs = [p[len("send:"):] for p in channel.proof if p.startswith("send:")]
+    proof_len = len(",".join(proofs))
+    print(f"Tamaño de la prueba: {proof_len}")
+    exec_time = timeit.timeit(
+        f"import estrategia_{number} as E{number}; E{number}.make_proof()",
+        number=TIMEIT_COUNT
+    )
+    print(f"Tiempo promedio de ejecución: {exec_time / TIMEIT_COUNT}")
 
-# Evaluating on a larger domain
-f_eval, eval_domain = generate_larger_domain_evaluation(group_size*larger_domain_multiplier, group_order, f)
 
-# Commitments
-f_merkle = MerkleTree(f_eval)
+def print_E4_performance():
+    # Estrategia 4
+    print("Estrategia 4")
 
-channel = Channel()
-channel.send(f_merkle.root)
+    print(f"Tamaño de la traza: {E4.TRACE_SIZE + 1} (doble traza)")
+    print(f"Tamaño del grupo: {E4.GROUP_SIZE}")
+    print(f"Tamaño del dominio de evaluación: {E4.EVAL_SIZE}")
 
-print(f'{time.time() - start}s')
-start = time.time()
-print("Generating the composition polynomial and the FRI layers...")
+    trace_a, trace_b = E4.generate_trace()
+    proof = E4.make_proof_a(trace_a)
+    channel = proof[0]
+    proofs = [p[len("send:"):] for p in channel.proof if p.startswith("send:")]
+    proof_len_a = len(",".join(proofs))
+    print(f"Tamaño de la prueba A: {proof_len_a}")
 
-polynomials = make_constraint_polys_e1(f, g, G, RESULT, group_size, trace_size)
+    proof = E4.make_proof_b(trace_b)
+    channel = proof[0]
+    proofs = [p[len("send:"):] for p in channel.proof if p.startswith("send:")]
+    proof_len_b = len(",".join(proofs))
+    print(f"Tamaño de la prueba B: {proof_len_b}")
+    print(f"Tamaño de la prueba total: {proof_len_a + proof_len_b}")
 
-# Commit on the composition polynomial
+    exec_time = timeit.timeit(
+        "import estrategia_4 as E4; trace_a, trace_b = E4.generate_trace();"
+        "E4.make_proof_a(trace_a); E4.make_proof_b(trace_b)",
+        number=TIMEIT_COUNT
+    )
+    print(f"Tiempo promedio de ejecución: {exec_time / TIMEIT_COUNT}")
 
-# channel = Channel() # ver si hay que crearlo de nuevo
-CP = get_CP(channel, polynomials)
-CP_eval = get_CP_eval(CP, eval_domain)
-CP_merkle = MerkleTree(CP_eval)
-channel.send(CP_merkle.root)
 
-# Part 3
-fri_polys, fri_domains, fri_layers, fri_merkles = FriCommit(CP, eval_domain, CP_eval, CP_merkle, channel)
-
-print(f'{time.time() - start}s')
-start = time.time()
-
-print("Generating queries and decommitments...")
-
-length = group_size*larger_domain_multiplier - 1
-decommit_fri(channel, f_eval, f_merkle, fri_layers, fri_merkles, length)
-
-print (channel.state)
-
-print(f'{time.time() - start}s')
-start = time.time()
-print(f'Overall time: {time.time() - start_all}s')
-print(f'Uncompressed proof length in characters: {len(str(channel.proof))}')
+print_E_performance("Estrategia 1", 1, E1)
+print_E_performance("Estrategia 2", 2, E2)
+print_E_performance("Estrategia 3", 3, E3)
+print_E4_performance()
