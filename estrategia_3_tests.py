@@ -3,7 +3,6 @@ import estrategia_3 as E3
 import utils as UT
 from field import FieldElement
 from polynomial import interpolate_poly
-from channel import Channel
 
 
 def test_generate_trace():
@@ -26,8 +25,14 @@ def test_make_f_poly():
     subgroup = UT.generate_subgroup(E3.GROUP_SIZE)
 
     f = UT.make_f_poly(trace, subgroup)
-    assert f.degree() == E3.TRACE_SIZE-1 # TODO: da 19, ver porque, segun vi, puede dar menor...
-    assert f(subgroup[E3.TRACE_SIZE-1]) == E3.RESULT
+
+    # Check f interpolates
+    g = subgroup[1]
+    for i in range(E3.TRACE_SIZE):
+        assert f(g ** i) == trace[i]
+
+    assert f.degree() == E3.TRACE_SIZE
+    assert f(subgroup[E3.TRACE_SIZE]) == E3.RESULT
     assert f(1) == 2
 
     for i in range(2, E3.TRACE_SIZE):
@@ -43,10 +48,12 @@ def test_make_constraint_polys():
 
     polys = E3.make_constraint_polys(f, G)
 
-    # assert p0.degree() == 59
-    # assert p1.degree() == 59
-    # assert p2.degree() == 60
-    # TODO: chequear grados 
+    assert polys[0].degree() == 18
+    assert polys[1].degree() == 18
+    assert polys[2].degree() == 68
+    assert polys[3].degree() == 29
+    CP = sum([polys[i] * (i + 1) for i in range(4)])
+    assert CP.degree() == 68
 
 
 def test_calculate_cp():
@@ -59,15 +66,15 @@ def test_calculate_cp():
     constraints = E3.make_constraint_polys(f, G)
     eval_domain = UT.make_eval_domain(E3.EVAL_SIZE)
 
-    # alphas = [FieldElement.random_element() for x in range(3)]
-    # CP = sum([constraints[i] * alphas[i] for i in range(3)])
-    channel = Channel()
+    alphas = [FieldElement.random_element() for x in range(len(constraints))]
+    CP = sum([constraints[i] * alphas[i] for i in range(len(constraints))])
+
     for idx in range(len(eval_domain)):
         x = eval_domain[idx]
-        x_calculated, cp_x_calculated = E3.calculate_cp(idx, f, G, E3.RESULT, channel)
-        # cp_x = CP(x)
+        x_calculated, cp_x_calculated = E3.calculate_cp(idx, f(x), f(g * x), alphas, G, E3.RESULT)
+        cp_x = CP(x)
         assert x_calculated == x
-        # assert cp_x_calculated == cp_x
+        assert cp_x_calculated == cp_x
 
 
 def test_make_eval_domain():
@@ -122,13 +129,12 @@ def test_make_proof():
 
     fri_size = math.ceil(math.log2(CP.degree()))
     assert fri_size == len(fri_polys[1:])
-    # assert fri_size == 6 # TODO: esto no esta dando, revisar que es el 6
+    assert fri_size == 7
+    assert fri_size == math.ceil(math.log2(68))  # 68 es el grado de CP
 
     # Merkle root commits on f
-    if E3.BLOWUP == 8:
-        assert channel.proof[0] == "send:4e3cc77d94d2d3e5746101f82c8d147c3007c6a74225daa603c001c4f9a81374"
-    elif E3.BLOWUP == 1:
-        assert channel.proof[0] == "send:53045f6684e4bd7b24f7fdd3c6a52fc22a97d72b2438b54e374eab7d3478f851"
+    if E3.BLOWUP == 4:
+        assert channel.proof[0] == "send:8ce80fdb178d30f3db6fec1cfff56e8e6439a779eef92dd327e48c2cb5b850ae"
 
     assert len(channel.proof) == (
         1 +  # commits on F

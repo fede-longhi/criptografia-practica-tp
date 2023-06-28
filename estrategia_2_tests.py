@@ -155,7 +155,7 @@ def test_add_query():
 def test_verifier():
     channel, f_eval, f_merkle, fri_polys, fri_domains, fri_layers, fri_merkles = E2.make_proof()
 
-    number_of_queries = 1
+    number_of_queries = 5
 
     for i in range(number_of_queries):
         E2.add_query(channel, f_eval, f_merkle, fri_polys, fri_domains, fri_layers, fri_merkles)
