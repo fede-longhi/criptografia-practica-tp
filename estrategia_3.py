@@ -136,35 +136,7 @@ def make_proof(channel=None):
     eval_domain = utils.make_eval_domain(EVAL_SIZE)
     constraints = make_constraint_polys(f, G)
 
-    f_eval, f_merkle = utils.make_commitment_merkle(f, eval_domain)
-
-    channel.send(f_merkle.root)
-
-    alphas = [channel.receive_random_field_element() for i in range(3)]
-    CP = sum([constraints[i] * alphas[i] for i in range(3)])
-
-    CP_eval, CP_merkle = utils.eval_and_commit(CP, eval_domain)
-
-    channel.send(CP_merkle.root)
-
-    # CP = FRI-0
-    fri_polys, fri_domains, fri_layers, fri_merkles = [CP], [eval_domain], [CP_eval], [CP_merkle]
-
-    fri_poly, fri_eval_domain = CP, eval_domain
-    while True:
-        beta = channel.receive_random_field_element()
-        fri_eval_domain, fri_poly = utils.make_fri_step(fri_poly, fri_eval_domain, beta)
-        fri_layer, fri_merkle = utils.eval_and_commit(fri_poly, fri_eval_domain)
-        fri_polys.append(fri_poly)
-        fri_domains.append(fri_eval_domain)
-        fri_layers.append(fri_layer)
-        fri_merkles.append(fri_merkle)
-        channel.send(fri_merkle.root)
-        if fri_poly.degree() < 1:
-            channel.send(str(fri_poly.poly[0]))
-            break
-
-    return channel, f_eval, f_merkle, fri_polys, fri_domains, fri_layers, fri_merkles
+    return utils.make_proof(channel, f, constraints, G, eval_domain)
 
 
 def add_query(channel, f_eval, f_merkle, fri_polys, fri_domains, fri_layers, fri_merkles):
@@ -200,7 +172,7 @@ def verifier(channel, result, number_of_queries):
     replay_channel = Channel()
     f_merkle_root = proofs[0]
     replay_channel.send(f_merkle_root)
-    alphas = [replay_channel.receive_random_field_element() for i in range(3)]
+    alphas = [replay_channel.receive_random_field_element() for i in range(4)]
 
     cp_merkle_root = proofs[1]
     replay_channel.send(cp_merkle_root)

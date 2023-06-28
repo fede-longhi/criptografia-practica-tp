@@ -2,7 +2,6 @@ import math
 import estrategia_3 as E3
 import utils as UT
 from field import FieldElement
-from polynomial import interpolate_poly
 
 
 def test_generate_trace():
@@ -44,7 +43,6 @@ def test_make_constraint_polys():
     G = UT.generate_subgroup(E3.GROUP_SIZE)
 
     f = UT.make_f_poly(trace, G)
-    f = interpolate_poly(G[:len(trace)], trace)
 
     polys = E3.make_constraint_polys(f, G)
 
@@ -138,7 +136,7 @@ def test_make_proof():
 
     assert len(channel.proof) == (
         1 +  # commits on F
-        3 +  # alfas for CP
+        4 +  # alfas for CP
         1 +  # commits on CP
         2 * fri_size +  # Beta + commit on FRI-X
         1  # Término constante del último FRI
