@@ -247,7 +247,7 @@ def test_verifier():
     # Check for A
     channel, f_eval, f_merkle, fri_polys, fri_domains, fri_layers, fri_merkles = E4.make_proof_a(trace_a)
 
-    number_of_queries = 1
+    number_of_queries = 10
 
     for i in range(number_of_queries):
         E4.add_query(channel, f_eval, f_merkle, fri_polys, fri_domains, fri_layers, fri_merkles)
@@ -257,7 +257,7 @@ def test_verifier():
     # Check for B
     channel, f_eval, f_merkle, fri_polys, fri_domains, fri_layers, fri_merkles = E4.make_proof_b(trace_b)
 
-    number_of_queries = 1
+    number_of_queries = 10
 
     for i in range(number_of_queries):
         E4.add_query(channel, f_eval, f_merkle, fri_polys, fri_domains, fri_layers, fri_merkles)

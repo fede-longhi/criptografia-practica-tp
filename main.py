@@ -5,7 +5,13 @@ import estrategia_2 as E2
 import estrategia_3 as E3
 import estrategia_4 as E4
 
-TIMEIT_COUNT = 100
+TIMEIT_COUNT = 10
+QUERIES = 10
+
+
+def calculate_proof_len(channel):
+    proofs = [p[len("send:"):] for p in channel.proof if p.startswith("send:")]
+    return len(",".join(proofs))
 
 
 def print_E_performance(name, number, E):
@@ -18,9 +24,13 @@ def print_E_performance(name, number, E):
 
     proof = E.make_proof()
     channel = proof[0]
-    proofs = [p[len("send:"):] for p in channel.proof if p.startswith("send:")]
-    proof_len = len(",".join(proofs))
-    print(f"Tamaño de la prueba: {proof_len}")
+    print(f"Tamaño de la prueba: {calculate_proof_len(channel)}")
+
+    for i in range(QUERIES):
+        E.add_query(*proof)
+
+    print(f"Tamaño de la prueba incluyendo {QUERIES} queries: {calculate_proof_len(channel)}")
+
     exec_time = timeit.timeit(
         f"import estrategia_{number} as E{number}; E{number}.make_proof()",
         number=TIMEIT_COUNT
@@ -37,18 +47,23 @@ def print_E4_performance():
     print(f"Tamaño del dominio de evaluación: {E4.EVAL_SIZE}")
 
     trace_a, trace_b = E4.generate_trace()
-    proof = E4.make_proof_a(trace_a)
-    channel = proof[0]
-    proofs = [p[len("send:"):] for p in channel.proof if p.startswith("send:")]
-    proof_len_a = len(",".join(proofs))
-    print(f"Tamaño de la prueba A: {proof_len_a}")
+    proof_a = E4.make_proof_a(trace_a)
+    channel_a = proof_a[0]
+    print(f"Tamaño de la prueba A: {calculate_proof_len(channel_a)}")
 
-    proof = E4.make_proof_b(trace_b)
-    channel = proof[0]
-    proofs = [p[len("send:"):] for p in channel.proof if p.startswith("send:")]
-    proof_len_b = len(",".join(proofs))
-    print(f"Tamaño de la prueba B: {proof_len_b}")
-    print(f"Tamaño de la prueba total: {proof_len_a + proof_len_b}")
+    proof_b = E4.make_proof_b(trace_b)
+    channel_b = proof_b[0]
+    print(f"Tamaño de la prueba B: {calculate_proof_len(channel_b)}")
+    total = calculate_proof_len(channel_a) + calculate_proof_len(channel_b)
+    print(f"Tamaño de la prueba total: {total}")
+
+    for i in range(QUERIES):
+        E4.add_query(*proof_a)
+
+        E4.add_query(*proof_b)
+
+    total = calculate_proof_len(channel_a) + calculate_proof_len(channel_b)
+    print(f"Tamaño de la prueba total incluyendo {QUERIES} queries: {total}")
 
     exec_time = timeit.timeit(
         "import estrategia_4 as E4; trace_a, trace_b = E4.generate_trace();"

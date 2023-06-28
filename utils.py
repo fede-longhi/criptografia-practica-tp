@@ -110,7 +110,8 @@ def make_proof(channel, f, constraints, G, eval_domain):
 
 def add_query(channel, f_eval, f_merkle, fri_polys, fri_domains, fri_layers, fri_merkles, BLOWUP):
     # En mi CP tengo f(x) y f(g*x), entonces x puede ser g**i i=0..len(f_eval - 8)
-    idx = channel.receive_random_int(0, len(f_eval) - BLOWUP)
+    idx = channel.receive_random_int(0, len(f_eval) - BLOWUP - 1)
+
     channel.send(str(f_eval[idx]))  # f(x)
     channel.send(",".join(f_merkle.get_authentication_path(idx)))  # auth path for f(x)
     channel.send(str(f_eval[idx + BLOWUP]))  # f(g*x)
@@ -165,7 +166,7 @@ def verifier(channel, result, number_of_queries,
 
     for query in range(number_of_queries):
         query_proofs = queries_proofs[query * proofs_per_query:(query + 1) * proofs_per_query]
-        idx = replay_channel.receive_random_int(0, EVAL_SIZE - BLOWUP)
+        idx = replay_channel.receive_random_int(0, EVAL_SIZE - BLOWUP - 1)
         fx = FieldElement(int(query_proofs[0]))
         fx_auth_path = query_proofs[1].split(",")
         fgx = FieldElement(int(query_proofs[2]))
