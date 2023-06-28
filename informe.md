@@ -2,6 +2,11 @@
 
 Para realizar el trabajo practico hemos desarrollado 4 estrategias descriptas en el enunciado del mismo. El trabajo fue realizado en python siguiendo los lineamientos de los tutoriales de stark-101.
 
+## Autores
+
+- Guillermo Mario Narvaja - Padrón 76.710
+- Federico Rodríguez Longhi 93.336
+
 ## Instrucciones de ejecución
 * `python main.py` : corre las diferentes estrategias e imprime los resultados.
 * `pytest estrategia_n_tests.py` : corre los tests correspondientes. (Hay que tener instalado pytest)
@@ -70,6 +75,10 @@ Dos columnas
 * Tiempo promedio de ejecución: 0.04752717000083066
 
 ---
+
+## Verificación
+
+Además de la generación de las pruebas, hicimos la verificación tal como la hubiera hecho un verifier que sólo recibe los mensajes en el canal.
 
 ## Conclusión
 De todas las estrategias, las más sencillas de implementar, por lo menos en este primer acercamiento, fueron las primeras dos, ya que las constraints eran simples y faciles de describir. En cuánto a tiempos, podemos decir que la estrategia 3 es la más rápida, seguida de la 4. Sin embargo, esta última se puede paralelizar haciendo más rápida la ejecución, lo que podría llegar a ser una ventaja. En cuánto a tamaños y memoria, vemos que la estrategia 2 es la peor de todas, teniendo la traza más grande de 61 elementos.
