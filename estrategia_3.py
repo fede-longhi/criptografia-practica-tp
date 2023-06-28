@@ -51,8 +51,6 @@ BLOWUP = 4  # El degree del CP es 68, 4 * 32 = 128 esta es la potencia de 2 que 
 
 EVAL_SIZE = GROUP_SIZE * BLOWUP
 
-cache = {}
-
 
 def generate_trace():
     # return utils.generate_trace([FieldElement(2)], lambda trace: trace[-1] ** 2, 60)
@@ -136,13 +134,11 @@ def make_proof(channel=None):
     G = utils.generate_subgroup(GROUP_SIZE)
     f = utils.make_f_poly(A, G)
     eval_domain = utils.make_eval_domain(EVAL_SIZE)
-    # eval_domain[idx] * G[1] = eval_domain[idx + 8]
+    constraints = make_constraint_polys(f, G)
 
     f_eval, f_merkle = utils.make_commitment_merkle(f, eval_domain)
 
     channel.send(f_merkle.root)
-
-    constraints = make_constraint_polys(f, G)
 
     alphas = [channel.receive_random_field_element() for i in range(3)]
     CP = sum([constraints[i] * alphas[i] for i in range(3)])
@@ -167,11 +163,6 @@ def make_proof(channel=None):
         if fri_poly.degree() < 1:
             channel.send(str(fri_poly.poly[0]))
             break
-
-    cache["CP"] = CP
-    cache["f"] = f
-    cache["G"] = G
-    cache["f_eval"] = f_eval
 
     return channel, f_eval, f_merkle, fri_polys, fri_domains, fri_layers, fri_merkles
 
