@@ -113,6 +113,31 @@ def make_proof(channel, f, constraints, G, eval_domain):
     return channel, f_eval, f_merkle, fri_polys, fri_domains, fri_layers, fri_merkles
 
 
+def add_query(channel, f_eval, f_merkle, fri_polys, fri_domains, fri_layers, fri_merkles, BLOWUP):
+    # En mi CP tengo f(x) y f(g*x), entonces x puede ser g**i i=0..len(f_eval - 8)
+    idx = channel.receive_random_int(0, len(f_eval) - BLOWUP)
+    channel.send(str(f_eval[idx]))  # f(x)
+    channel.send(",".join(f_merkle.get_authentication_path(idx)))  # auth path for f(x)
+    channel.send(str(f_eval[idx + BLOWUP]))  # f(g*x)
+    channel.send(",".join(f_merkle.get_authentication_path(idx + BLOWUP)))  # auth path for f(g*x)
+    # print(
+    #    f"idx = {idx} / X = {fri_domains[0][idx]} / f(x) = {f_eval[idx]} / "
+    #    f"f(gx) = {f_eval[idx + BLOWUP]}"
+    #    f" / CP(x) = {fri_polys[0](fri_domains[0][idx])} / CP(x) = {fri_layers[0][idx]}"
+    # )
+
+    for layer, merkle in zip(fri_layers[:-1], fri_merkles[:-1]):
+        length = len(layer)
+        idx = idx % length
+        sib_idx = (idx + length // 2) % length
+        channel.send(str(layer[idx]))
+        channel.send(",".join(merkle.get_authentication_path(idx)))
+        channel.send(str(layer[sib_idx]))
+        channel.send(",".join(merkle.get_authentication_path(sib_idx)))
+        # print(f"{length} - cp(x) {layer[idx]} - cp(-x) {layer[sib_idx]}")
+    channel.send(str(fri_layers[-1][0]))
+
+
 def generate_group_and_generator(group_order, sub_group_size):
     assert (group_order / sub_group_size) == (group_order // sub_group_size), \
         "El tamaño no es divisor del orden del grupo"
