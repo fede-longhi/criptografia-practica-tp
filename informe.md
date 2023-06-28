@@ -12,6 +12,7 @@ A continuación detallamos los resultados de las distintas estrategias. Las mism
 Además cada una tiene un archivo de pruebas donde se verifica paso a paso la correcta implementación de cada método.
 
 ---
+
 ### Estrategia 1
 $a_0 = 2$\
 $a_{n+1} = a_n^8$
@@ -25,6 +26,7 @@ $a_{n+1} = a_n^8$
 * Tiempo promedio de ejecución: 0.05004346999921836
 
 ---
+
 ### Estrategia 2
 $a_0 = 2$\
 $a_{n+1} = a_n^2$
@@ -38,6 +40,7 @@ $a_{n+1} = a_n^2$
 * Tiempo promedio de ejecución: 0.06114284000359475
 
 ---
+
 ### Estrategia 3
 $a_0 = 2$\
 $a_{2n+1} = (a_{2n})^2$\
@@ -52,6 +55,7 @@ $a_{2n} = (a_{2n-1})^4$
 * Tiempo promedio de ejecución: 0.03636028000037186
 
 ---
+
 ### Estrategia 4
 Dos columnas
 
