@@ -1,0 +1,84 @@
+gnarvaja@bermudas:~/tmp/repoclones/starknet_stack_prover_lambdaworks$ make docker_compile_and_run_all PROGRAM=fibonacci_10.cairo
+cargo build --bin cairo-platinum-prover --release --features instruments
+warning: /home/gnarvaja/tmp/repoclones/starknet_stack_prover_lambdaworks/cairo_prover/Cargo.toml: unused manifest key: bench.0.metal
+warning: /home/gnarvaja/tmp/repoclones/starknet_stack_prover_lambdaworks/cairo_prover/Cargo.toml: unused manifest key: bench.1.metal
+warning: /home/gnarvaja/tmp/repoclones/starknet_stack_prover_lambdaworks/cairo_prover/Cargo.toml: unused manifest key: bench.2.metal
+    Finished release [optimized] target(s) in 0.11s
+Compiling program with docker
+Compiling done 
+
+Running program on CairoVM and generating trace ...
+  Time spent: 506.519µs 
+
+Making proof ...
+Time spent in proving: 523.939362ms 
+
+Verifying ...
+- Started step 1: Recover challenges
+  Time spent: 347.641µs
+- Started step 2: Verify claimed polynomial
+  Time spent: 34.776µs
+- Started step 3: Verify FRI
+  Time spent: 1.97559ms
+- Started step 4: Verify deep composition polynomial
+  Time spent: 1.277605ms
+ Fraction of verifying time per step: 0.0956 0.0096 0.5434 0.3514
+Time spent in verifying: 3.650129ms 
+
+Verification succeded
+gnarvaja@bermudas:~/tmp/repoclones/starknet_stack_prover_lambdaworks$ make docker_compile_and_run_all PROGRAM=fibonacci_100.cairo
+cargo build --bin cairo-platinum-prover --release --features instruments
+warning: /home/gnarvaja/tmp/repoclones/starknet_stack_prover_lambdaworks/cairo_prover/Cargo.toml: unused manifest key: bench.0.metal
+warning: /home/gnarvaja/tmp/repoclones/starknet_stack_prover_lambdaworks/cairo_prover/Cargo.toml: unused manifest key: bench.1.metal
+warning: /home/gnarvaja/tmp/repoclones/starknet_stack_prover_lambdaworks/cairo_prover/Cargo.toml: unused manifest key: bench.2.metal
+    Finished release [optimized] target(s) in 0.11s
+Compiling program with docker
+Compiling done 
+
+Running program on CairoVM and generating trace ...
+  Time spent: 2.219731ms 
+
+Making proof ...
+Time spent in proving: 1.940580129s 
+
+Verifying ...
+- Started step 1: Recover challenges
+  Time spent: 1.658077ms
+- Started step 2: Verify claimed polynomial
+  Time spent: 37.543µs
+- Started step 3: Verify FRI
+  Time spent: 3.039174ms
+- Started step 4: Verify deep composition polynomial
+  Time spent: 1.384503ms
+ Fraction of verifying time per step: 0.2710 0.0061 0.4967 0.2263
+Time spent in verifying: 6.140901ms 
+
+Verification succeded
+gnarvaja@bermudas:~/tmp/repoclones/starknet_stack_prover_lambdaworks$ make docker_compile_and_run_all PROGRAM=fibonacci_1000.cairo
+cargo build --bin cairo-platinum-prover --release --features instruments
+warning: /home/gnarvaja/tmp/repoclones/starknet_stack_prover_lambdaworks/cairo_prover/Cargo.toml: unused manifest key: bench.0.metal
+warning: /home/gnarvaja/tmp/repoclones/starknet_stack_prover_lambdaworks/cairo_prover/Cargo.toml: unused manifest key: bench.1.metal
+warning: /home/gnarvaja/tmp/repoclones/starknet_stack_prover_lambdaworks/cairo_prover/Cargo.toml: unused manifest key: bench.2.metal
+    Finished release [optimized] target(s) in 0.11s
+Compiling program with docker
+Compiling done 
+
+Running program on CairoVM and generating trace ...
+  Time spent: 24.850635ms 
+
+Making proof ...
+Time spent in proving: 1.671989685s 
+
+Verifying ...
+- Started step 1: Recover challenges
+  Time spent: 14.170687ms
+- Started step 2: Verify claimed polynomial
+  Time spent: 55.882µs
+- Started step 3: Verify FRI
+  Time spent: 4.596738ms
+- Started step 4: Verify deep composition polynomial
+  Time spent: 1.593186ms
+ Fraction of verifying time per step: 0.6941 0.0027 0.2251 0.0780
+Time spent in verifying: 20.502439ms 
+
+Verification succeded
